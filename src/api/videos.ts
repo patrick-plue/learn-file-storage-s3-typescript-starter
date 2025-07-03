@@ -50,8 +50,9 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
     const key = `${aspectRatio}/${videoId}.mp4`;
     await uploadVideoToS3(cfg, key, processedFilePath, 'video/mp4');
 
-    const videoURL = `https://${cfg.s3Bucket}.s3.${cfg.s3Region}.amazonaws.com/${key}`;
-    video.videoURL = key;
+    const videoURL = `${cfg.s3CfDistribution}/${key}`;
+    // const videoURL = `https://${cfg.s3Bucket}.s3.${cfg.s3Region}.amazonaws.com/${key}`;
+    video.videoURL = videoURL;
     updateVideo(cfg.db, video);
 
     await Promise.all([
@@ -59,8 +60,7 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
         rm(`${tempFilePath}.processed.mp4`, { force: true }),
     ]);
 
-    const presignedVideo = dbVideoToSignedVideo(cfg, video);
-    return respondWithJSON(200, presignedVideo);
+    return respondWithJSON(200, video);
 }
 
 export async function getVideoAspectRatio(filePath: string) {
@@ -135,21 +135,4 @@ export async function processVideoForFastStart(inputFilePath: string) {
     }
 
     return processedFilePath;
-}
-
-function generatePresignedURL(cfg: ApiConfig, key: string, expireTime: number) {
-    const presignedURL = cfg.s3Client.presign(key, {
-        expiresIn: expireTime,
-    });
-
-    return presignedURL;
-}
-
-export function dbVideoToSignedVideo(cfg: ApiConfig, video: Video) {
-    if (!video.videoURL) {
-        return video;
-    }
-    video.videoURL = generatePresignedURL(cfg, video.videoURL, 2000);
-
-    return video;
 }
